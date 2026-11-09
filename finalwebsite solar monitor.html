@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Harvest & Grid Consumption Monitor</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#121212',
+                        cardbg: '#1e1e1e',
+                        borderbg: '#2e2e2e',
+                        solarGreen: '#00E676',
+                        solarGreenHover: '#00c853',
+                        gridOrange: '#FF9800',
+                        gridOrangeHover: '#f57c00',
+                        gridAmber: '#FFC107',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        /* Custom scrollbar for table container */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-darkbg text-gray-200 pb-12">
+
+    <!-- Navigation Header -->
+    <header class="bg-cardbg border-b border-borderbg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-solarGreen/10 p-2.5 rounded-xl border border-solarGreen/30 text-solarGreen">
+                    <i class="fa-solid fa-solar-panel text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Solar & Grid Energy Dashboard
+                    </h1>
+                    <p class="text-xs text-gray-400">Track monthly harvest, consumption & Philippine Peso (?) savings</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="resetToDefaults()" class="px-3 py-2 text-xs font-medium text-gray-400 hover:text-white bg-borderbg/50 hover:bg-borderbg rounded-lg transition-all border border-gray-700">
+                    <i class="fa-solid fa-rotate-left mr-1"></i> Reset Sample Data
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+
+        <!-- Top KPI Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Total Solar Harvest Card -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-solarGreen/5 group-hover:text-solarGreen/10 transition-colors text-8xl">
+                    <i class="fa-solid fa-sun"></i>
+                </div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Solar Harvest</p>
+                <div class="flex items-baseline gap-2">
+                    <h2 id="kpi-total-solar" class="text-3xl font-extrabold text-solarGreen">0</h2>
+                    <span class="text-sm text-solarGreen font-medium">kWh</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                    <i class="fa-solid fa-bolt text-solarGreen"></i> Clean energy generated (Input 1)
+                </p>
+            </div>
+
+            <!-- Total Grid Consumption Card -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-gridOrange/5 group-hover:text-gridOrange/10 transition-colors text-8xl">
+                    <i class="fa-solid fa-plug text-gridOrange"></i>
+                </div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Grid Consumption</p>
+                <div class="flex items-baseline gap-2">
+                    <h2 id="kpi-total-grid" class="text-3xl font-extrabold text-gridOrange">0</h2>
+                    <span class="text-sm text-gridOrange font-medium">kWh</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                    <i class="fa-solid fa-tower-broadcast text-gridOrange"></i> Utility grid imported (Input 2)
+                </p>
+            </div>
+
+            <!-- Total Bill With Solar -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 text-gridOrange/5 group-hover:text-gridOrange/10 transition-colors text-8xl">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                </div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Actual Paid (With Solar)</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-bold text-gridOrange">?</span>
+                    <h2 id="kpi-paid-solar" class="text-3xl font-extrabold text-gridOrange">0.00</h2>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                    <span class="text-gray-400">Without Solar:</span>
+                    <span id="kpi-paid-nosolar" class="text-gray-300 font-semibold">?0.00</span>
+                </p>
+            </div>
+
+            <!-- Total Savings Card -->
+            <div class="bg-cardbg border border-solarGreen/40 rounded-xl p-5 shadow-lg relative overflow-hidden group bg-gradient-to-br from-cardbg via-cardbg to-solarGreen/10">
+                <div class="absolute -right-4 -bottom-4 text-solarGreen/10 group-hover:text-solarGreen/20 transition-colors text-8xl">
+                    <i class="fa-solid fa-piggy-bank"></i>
+                </div>
+                <p class="text-xs font-semibold text-solarGreen uppercase tracking-wider mb-1">Total Solar Savings</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-bold text-solarGreen">?</span>
+                    <h2 id="kpi-total-savings" class="text-3xl font-extrabold text-solarGreen">0.00</h2>
+                </div>
+                <p class="text-xs text-solarGreen/80 mt-2 flex items-center gap-1 font-medium">
+                    <i class="fa-solid fa-chart-line"></i> Direct cost reduction (Input 1 × Input 3)
+                </p>
+            </div>
+
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Chart 1: Solar vs Grid Energy (kWh) -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-solarGreen"></i> Solar Harvest vs Grid Consumption
+                        </h3>
+                        <p class="text-xs text-gray-400">Monthly comparison in Kilowatt-hours (kWh)</p>
+                    </div>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="energyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Cost Comparison & Savings (?) -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-gridOrange"></i> Financial Bill & Savings Comparison
+                        </h3>
+                        <p class="text-xs text-gray-400">Bill With Solar vs. Savings vs. Without Solar (?)</p>
+                    </div>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Form & Data Table Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Dynamic Entry Form Column -->
+            <div class="lg:col-span-1 bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-borderbg">
+                        <i class="fa-solid fa-circle-plus text-solarGreen text-lg"></i>
+                        <h3 class="text-base font-bold text-white" id="form-title">Add Monthly Data</h3>
+                    </div>
+
+                    <form id="energyForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                        <input type="hidden" id="edit-id" value="">
+
+                        <!-- Month Picker -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1" for="inputMonth">Month</label>
+                            <input type="month" id="inputMonth" required class="w-full bg-darkbg border border-borderbg rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-solarGreen transition-colors">
+                        </div>
+
+                        <!-- First Input: Solar Harvest -->
+                        <div>
+                            <label class="block text-xs font-semibold text-solarGreen uppercase tracking-wider mb-1" for="inputSolar">
+                                First Input: Solar Harvest (kWh)
+                            </label>
+                            <div class="relative">
+                                <input type="number" id="inputSolar" step="0.01" min="0" placeholder="e.g. 450" required class="w-full bg-darkbg border border-borderbg rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-solarGreen transition-colors">
+                                <span class="absolute right-3 top-2.5 text-xs text-gray-400">kWh</span>
+                            </div>
+                        </div>
+
+                        <!-- Second Input: Grid Consumption -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gridOrange uppercase tracking-wider mb-1" for="inputGrid">
+                                Second Input: Grid Consumption (kWh)
+                            </label>
+                            <div class="relative">
+                                <input type="number" id="inputGrid" step="0.01" min="0" placeholder="e.g. 280" required class="w-full bg-darkbg border border-borderbg rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gridOrange transition-colors">
+                                <span class="absolute right-3 top-2.5 text-xs text-gray-400">kWh</span>
+                            </div>
+                        </div>
+
+                        <!-- Third Input: Grid Price -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gridAmber uppercase tracking-wider mb-1" for="inputPrice">
+                                Third Input: Grid Price in Peso (?/kWh)
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-xs text-gray-400">?</span>
+                                <input type="number" id="inputPrice" step="0.01" min="0" placeholder="e.g. 11.50" required class="w-full bg-darkbg border border-borderbg rounded-lg pl-7 pr-3 py-2 text-sm text-white focus:outline-none focus:border-gridAmber transition-colors">
+                            </div>
+                        </div>
+
+                        <!-- Live Calculation Formula Preview Box -->
+                        <div class="bg-darkbg/70 border border-borderbg rounded-lg p-3 space-y-2 text-xs">
+                            <div class="text-gray-400 font-semibold mb-1 flex justify-between items-center">
+                                <span>Formula Preview</span>
+                                <i class="fa-solid fa-calculator text-gray-500"></i>
+                            </div>
+                            <div class="flex justify-between text-gray-300">
+                                <span>Bill w/ Solar (Input 2 × 3):</span>
+                                <span id="prev-bill-solar" class="font-semibold text-gridOrange">?0.00</span>
+                            </div>
+                            <div class="flex justify-between text-gray-300">
+                                <span>Monthly Savings (Input 1 × 3):</span>
+                                <span id="prev-savings" class="font-semibold text-solarGreen">?0.00</span>
+                            </div>
+                            <div class="flex justify-between text-gray-300">
+                                <span>Bill w/o Solar ((1+2) × 3 × 1.2):</span>
+                                <span id="prev-bill-nosolar" class="font-semibold text-gray-400">?0.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="flex gap-2 pt-2">
+                            <button type="submit" id="submit-btn" class="flex-1 bg-solarGreen hover:bg-solarGreenHover text-gray-900 font-bold py-2 px-4 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-plus"></i> <span id="btn-text">Add Month Record</span>
+                            </button>
+                            <button type="button" id="cancel-btn" onclick="resetForm()" class="hidden bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg text-sm transition-all">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Data Log Table Column -->
+            <div class="lg:col-span-2 bg-cardbg border border-borderbg rounded-xl p-5 shadow-lg flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b border-borderbg">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-table text-solarGreen"></i> Monthly Log & History
+                        </h3>
+                        <p class="text-xs text-gray-400">View formulas calculated per month</p>
+                    </div>
+                    <span id="record-count" class="text-xs font-semibold px-2.5 py-1 bg-borderbg rounded-full text-gray-300">
+                        0 Entries
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-borderbg flex-grow">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-darkbg text-gray-400 border-b border-borderbg uppercase font-medium">
+                                <th class="p-3">Month</th>
+                                <th class="p-3 text-right">Solar (kWh)</th>
+                                <th class="p-3 text-right">Grid (kWh)</th>
+                                <th class="p-3 text-right">Price (?)</th>
+                                <th class="p-3 text-right">Bill w/ Solar</th>
+                                <th class="p-3 text-right">Savings</th>
+                                <th class="p-3 text-right">Bill w/o Solar</th>
+                                <th class="p-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody" class="divide-y divide-borderbg text-gray-300">
+                            <!-- Dynamic rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- App Logic Script -->
+    <script>
+        // Sample 6-Month Initial Data
+        const initialData = [
+            { id: '1', month: '2024-01', solar: 450, grid: 280, price: 11.50 },
+            { id: '2', month: '2024-02', solar: 480, grid: 260, price: 11.75 },
+            { id: '3', month: '2024-03', solar: 530, grid: 240, price: 12.00 },
+            { id: '4', month: '2024-04', solar: 610, grid: 220, price: 12.25 },
+            { id: '5', month: '2024-05', solar: 640, grid: 200, price: 12.50 },
+            { id: '6', month: '2024-06', solar: 570, grid: 250, price: 12.10 }
+        ];
+
+        // App State
+        let records = JSON.parse(localStorage.getItem('solar_grid_records')) || initialData;
+        let energyChartInstance = null;
+        let costChartInstance = null;
+
+        // Initialize App
+        window.onload = function() {
+            const today = new Date();
+            document.getElementById('inputMonth').value = today.toISOString().slice(0, 7);
+
+            // Listen for input changes for live calculation preview
+            ['inputSolar', 'inputGrid', 'inputPrice'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateLivePreview);
+            });
+
+            renderApp();
+        };
+
+        // --- Exact Requested Formulas ---
+        // 1. Monthly bill with solar = grid price * grid consumption
+        function calcBillWithSolar(grid, price) {
+            return grid * price;
+        }
+
+        // 2. Monthly save = solar harvest * grid price (first input * third input)
+        function calcMonthlySavings(solar, price) {
+            return solar * price;
+        }
+
+        // 3. Monthly without solar = (first input + second input) * third input * 1.2
+        function calcBillWithoutSolar(solar, grid, price) {
+            return (solar + grid) * price * 1.2;
+        }
+
+        // Real-time calculation formula preview handler
+        function updateLivePreview() {
+            const solar = parseFloat(document.getElementById('inputSolar').value) || 0;
+            const grid = parseFloat(document.getElementById('inputGrid').value) || 0;
+            const price = parseFloat(document.getElementById('inputPrice').value) || 0;
+
+            const billWithSolar = calcBillWithSolar(grid, price);
+            const savings = calcMonthlySavings(solar, price);
+            const billWithoutSolar = calcBillWithoutSolar(solar, grid, price);
+
+            document.getElementById('prev-bill-solar').textContent = `?${billWithSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('prev-savings').textContent = `?${savings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('prev-bill-nosolar').textContent = `?${billWithoutSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+
+        // Master UI Render Function
+        function renderApp() {
+            records.sort((a, b) => a.month.localeCompare(b.month));
+            localStorage.setItem('solar_grid_records', JSON.stringify(records));
+
+            renderSummaryKPIs();
+            renderTable();
+            renderCharts();
+        }
+
+        // Update Top Cards
+        function renderSummaryKPIs() {
+            let totalSolar = 0;
+            let totalGrid = 0;
+            let totalBillSolar = 0;
+            let totalBillNoSolar = 0;
+            let totalSavings = 0;
+
+            records.forEach(r => {
+                totalSolar += r.solar;
+                totalGrid += r.grid;
+                totalBillSolar += calcBillWithSolar(r.grid, r.price);
+                totalSavings += calcMonthlySavings(r.solar, r.price);
+                totalBillNoSolar += calcBillWithoutSolar(r.solar, r.grid, r.price);
+            });
+
+            document.getElementById('kpi-total-solar').textContent = totalSolar.toLocaleString('en-US', {maximumFractionDigits: 1});
+            document.getElementById('kpi-total-grid').textContent = totalGrid.toLocaleString('en-US', {maximumFractionDigits: 1});
+            document.getElementById('kpi-paid-solar').textContent = totalBillSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('kpi-paid-nosolar').textContent = `?${totalBillNoSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('kpi-total-savings').textContent = totalSavings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('record-count').textContent = `${records.length} Record${records.length === 1 ? '' : 's'}`;
+        }
+
+        // Update Table
+        function renderTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+
+            if (records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-gray-500">
+                            No monthly records found. Add your first entry using the form.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            records.forEach(r => {
+                const billSolar = calcBillWithSolar(r.grid, r.price);
+                const savings = calcMonthlySavings(r.solar, r.price);
+                const billNoSolar = calcBillWithoutSolar(r.solar, r.grid, r.price);
+
+                const monthObj = new Date(r.month + '-01');
+                const formattedMonth = monthObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-borderbg/40 transition-colors';
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-white">${formattedMonth}</td>
+                    <td class="p-3 text-right font-medium text-solarGreen">${r.solar.toLocaleString()}</td>
+                    <td class="p-3 text-right font-medium text-gridOrange">${r.grid.toLocaleString()}</td>
+                    <td class="p-3 text-right text-gray-300">?${r.price.toFixed(2)}</td>
+                    <td class="p-3 text-right font-semibold text-gridOrange">?${billSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="p-3 text-right font-bold text-solarGreen">?${savings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="p-3 text-right text-gray-400">?${billNoSolar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="editRecord('${r.id}')" class="text-gray-400 hover:text-solarGreen transition-colors p-1" title="Edit">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="deleteRecord('${r.id}')" class="text-gray-400 hover:text-red-400 transition-colors p-1" title="Delete">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Render Chart.js Visualizations
+        function renderCharts() {
+            const labels = records.map(r => {
+                const d = new Date(r.month + '-01');
+                return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            });
+
+            const solarData = records.map(r => r.solar);
+            const gridData = records.map(r => r.grid);
+
+            const billSolarData = records.map(r => calcBillWithSolar(r.grid, r.price));
+            const savingsData = records.map(r => calcMonthlySavings(r.solar, r.price));
+            const billNoSolarData = records.map(r => calcBillWithoutSolar(r.solar, r.grid, r.price));
+
+            if (energyChartInstance) energyChartInstance.destroy();
+            if (costChartInstance) costChartInstance.destroy();
+
+            // Energy Harvest vs Consumption Chart
+            const ctxEnergy = document.getElementById('energyChart').getContext('2d');
+            energyChartInstance = new Chart(ctxEnergy, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Solar Harvest (kWh)',
+                            data: solarData,
+                            backgroundColor: '#00E676',
+                            borderRadius: 6,
+                            barPercentage: 0.6
+                        },
+                        {
+                            label: 'Grid Consumption (kWh)',
+                            data: gridData,
+                            backgroundColor: '#FF9800',
+                            borderRadius: 6,
+                            barPercentage: 0.6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0', font: { family: 'Inter', size: 12 } } },
+                        tooltip: {
+                            backgroundColor: '#1e1e1e',
+                            titleColor: '#fff',
+                            borderColor: '#2e2e2e',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString()} kWh`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: '#2e2e2e' } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: '#2e2e2e' } }
+                    }
+                }
+            });
+
+            // Costs & Savings Chart
+            const ctxCost = document.getElementById('costChart').getContext('2d');
+            costChartInstance = new Chart(ctxCost, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Monthly Savings (?)',
+                            data: savingsData,
+                            borderColor: '#00E676',
+                            backgroundColor: 'rgba(0, 230, 118, 0.15)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#00E676'
+                        },
+                        {
+                            label: 'Bill With Solar (?)',
+                            data: billSolarData,
+                            borderColor: '#FF9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.15)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#FF9800'
+                        },
+                        {
+                            label: 'Bill Without Solar (?)',
+                            data: billNoSolarData,
+                            borderColor: '#71717a',
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointBackgroundColor: '#71717a'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0', font: { family: 'Inter', size: 12 } } },
+                        tooltip: {
+                            backgroundColor: '#1e1e1e',
+                            titleColor: '#fff',
+                            borderColor: '#2e2e2e',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ?${ctx.raw.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: '#2e2e2e' } },
+                        y: {
+                            ticks: {
+                                color: '#9ca3af',
+                                callback: (v) => '?' + v.toLocaleString()
+                            },
+                            grid: { color: '#2e2e2e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Form Submit Handler
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const editId = document.getElementById('edit-id').value;
+            const month = document.getElementById('inputMonth').value;
+            const solar = parseFloat(document.getElementById('inputSolar').value);
+            const grid = parseFloat(document.getElementById('inputGrid').value);
+            const price = parseFloat(document.getElementById('inputPrice').value);
+
+            if (!month || isNaN(solar) || isNaN(grid) || isNaN(price)) return;
+
+            if (editId) {
+                const idx = records.findIndex(r => r.id === editId);
+                if (idx !== -1) records[idx] = { id: editId, month, solar, grid, price };
+            } else {
+                const existingIdx = records.findIndex(r => r.month === month);
+                if (existingIdx !== -1) {
+                    records[existingIdx] = { id: records[existingIdx].id, month, solar, grid, price };
+                } else {
+                    records.push({ id: Date.now().toString(), month, solar, grid, price });
+                }
+            }
+
+            resetForm();
+            renderApp();
+        }
+
+        // Edit Entry
+        function editRecord(id) {
+            const r = records.find(rec => rec.id === id);
+            if (!r) return;
+
+            document.getElementById('edit-id').value = r.id;
+            document.getElementById('inputMonth').value = r.month;
+            document.getElementById('inputSolar').value = r.solar;
+            document.getElementById('inputGrid').value = r.grid;
+            document.getElementById('inputPrice').value = r.price;
+
+            document.getElementById('form-title').textContent = 'Edit Record';
+            document.getElementById('btn-text').textContent = 'Update Record';
+            document.getElementById('cancel-btn').classList.remove('hidden');
+
+            updateLivePreview();
+        }
+
+        // Delete Entry
+        function deleteRecord(id) {
+            records = records.filter(r => r.id !== id);
+            renderApp();
+        }
+
+        // Reset Form
+        function resetForm() {
+            document.getElementById('edit-id').value = '';
+            document.getElementById('energyForm').reset();
+            const today = new Date();
+            document.getElementById('inputMonth').value = today.toISOString().slice(0, 7);
+            document.getElementById('form-title').textContent = 'Add Monthly Data';
+            document.getElementById('btn-text').textContent = 'Add Month Record';
+            document.getElementById('cancel-btn').classList.add('hidden');
+            updateLivePreview();
+        }
+
+        // Reset to Default Sample Data
+        function resetToDefaults() {
+            records = [...initialData];
+            resetForm();
+            renderApp();
+        }
+    </script>
+</body>
+</html>
